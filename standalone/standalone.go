@@ -18,7 +18,6 @@ import (
 	"strings"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic/grpcdynamic"
 	"google.golang.org/grpc"
 
 	"github.com/fullstorydev/grpcui"
@@ -42,7 +41,7 @@ const csrfHeaderName = "x-grpcui-csrf-token"
 //
 // The returned handler expects to serve resources from "/". If it will instead
 // be handling a sub-path (e.g. handling "/rpc-ui/") then use http.StripPrefix.
-func Handler(ch grpcdynamic.Channel, target string, methods []*desc.MethodDescriptor, files []*desc.FileDescriptor, opts ...HandlerOption) http.Handler {
+func Handler(target string, methods []*desc.MethodDescriptor, files []*desc.FileDescriptor, opts ...HandlerOption) http.Handler {
 	uiOpts := &handlerOptions{
 		indexTmpl: defaultIndexTemplate,
 		css:       grpcui.WebFormSampleCSS(),
@@ -89,13 +88,27 @@ func Handler(ch grpcdynamic.Channel, target string, methods []*desc.MethodDescri
 			http.NotFound(w, r)
 		}
 	})
+	mux.HandleFunc("/change_target", func(w http.ResponseWriter, r *http.Request) {
+		currTarget := r.FormValue("target_host")
+		if err := grpcui.UpdateTarget(currTarget); err != nil {
+			currTarget = "connection failed: " + err.Error()
+		}
+		indexContents := getIndexContents(uiOpts.indexTmpl, currTarget, webFormHTML, uiOpts.tmplResources)
+		indexResource := newResource("/change_target", indexContents, "text/html; charset=utf-8", false)
+		indexResource.MustRevalidate = true
+		if r.URL.Path == "/change_target" {
+			indexResource.ServeHTTP(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})
 
 	invokeOpts := grpcui.InvokeOptions{
 		ExtraMetadata:   uiOpts.extraMetadata,
 		PreserveHeaders: uiOpts.preserveHeaders,
 		Verbosity:       uiOpts.invokeVerbosity,
 	}
-	rpcInvokeHandler := http.StripPrefix("/invoke", grpcui.RPCInvokeHandlerWithOptions(ch, methods, invokeOpts))
+	rpcInvokeHandler := http.StripPrefix("/invoke", grpcui.RPCInvokeHandlerWithOptions(nil, methods, invokeOpts))
 	mux.HandleFunc("/invoke/", func(w http.ResponseWriter, r *http.Request) {
 		// CSRF protection
 		c, _ := r.Cookie(csrfCookieName)
@@ -303,5 +316,5 @@ func HandlerViaReflection(ctx context.Context, cc grpc.ClientConnInterface, targ
 		return nil, err
 	}
 
-	return Handler(cc, target, m, f, opts...), nil
+	return Handler(target, m, f, opts...), nil
 }

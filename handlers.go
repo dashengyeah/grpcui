@@ -94,7 +94,7 @@ func RPCInvokeHandlerWithOptions(ch grpc.ClientConnInterface, descs []*desc.Meth
 					http.Error(w, "Failed to create descriptor source: "+err.Error(), http.StatusInternalServerError)
 					return
 				}
-				results, err := invokeRPC(r.Context(), method, ch, descSource, r.Header, r.Body, &options)
+				results, err := invokeRPC(r.Context(), method, descSource, r.Header, r.Body, &options)
 				if err != nil {
 					if _, ok := err.(errReadFail); ok {
 						http.Error(w, "Failed to read request", 499)
@@ -412,7 +412,7 @@ func (e errReadFail) Error() string {
 	return e.err.Error()
 }
 
-func invokeRPC(ctx context.Context, methodName string, ch grpc.ClientConnInterface, descSource grpcurl.DescriptorSource, reqHdrs http.Header, body io.Reader, options *InvokeOptions) (*rpcResult, error) {
+func invokeRPC(ctx context.Context, methodName string, descSource grpcurl.DescriptorSource, reqHdrs http.Header, body io.Reader, options *InvokeOptions) (*rpcResult, error) {
 	js, err := io.ReadAll(body)
 	if err != nil {
 		return nil, errReadFail{err: err}
@@ -460,7 +460,7 @@ func invokeRPC(ctx context.Context, methodName string, ch grpc.ClientConnInterfa
 		descSource: descSource,
 		Requests:   &reqStats,
 	}
-	if err := grpcurl.InvokeRPC(ctx, descSource, ch, methodName, invokeHdrs, &result, requestFunc); err != nil {
+	if err := grpcurl.InvokeRPC(ctx, descSource, GetTarget(), methodName, invokeHdrs, &result, requestFunc); err != nil {
 		return nil, err
 	}
 

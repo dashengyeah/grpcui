@@ -19,6 +19,10 @@ deps:
 updatedeps:
 	go get -d -v -t -u -f ./...
 
+.PHONY: build
+build:
+	go build -ldflags '-X "main.version=dev build $(dev_build_version)"' -o dist/grpcui.exe ./cmd/grpcui
+
 .PHONY: install
 install:
 	go install -ldflags '-X "main.version=dev build $(dev_build_version)"' ./...

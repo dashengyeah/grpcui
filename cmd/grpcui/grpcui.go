@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fullstorydev/grpcui"
 	"github.com/fullstorydev/grpcurl"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/grpcreflect"
@@ -347,7 +348,9 @@ func main() {
 	}
 
 	flags.Usage = usage
-	flags.Parse(os.Args[1:])
+	if err := flags.Parse(os.Args[1:]); err != nil {
+		fail(err, "parse args")
+	}
 
 	if *help {
 		usage()
@@ -538,6 +541,7 @@ func main() {
 	if isUnixSocket != nil && isUnixSocket() {
 		network = "unix"
 	}
+	grpcui.SetDialOpts(dialTime, creds, *connectFailFast, opts...)
 	cc, err := dial(dialCtx, network, target, creds, *connectFailFast, opts...)
 	if err != nil {
 		fail(err, "Failed to dial target host %q", target)
@@ -629,7 +633,7 @@ func main() {
 	handlerOpts = append(handlerOpts, configureJSandCSS(extraCSS, standalone.AddCSSFile)...)
 	handlerOpts = append(handlerOpts, configureAssets(otherAssets)...)
 
-	handler := standalone.Handler(cc, target, methods, allFiles, handlerOpts...)
+	handler := standalone.Handler(target, methods, allFiles, handlerOpts...)
 	if *maxTime > 0 {
 		timeout := time.Duration(*maxTime * float64(time.Second))
 		// enforce the timeout by wrapping the handler and inserting a
